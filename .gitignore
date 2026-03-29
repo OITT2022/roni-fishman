@@ -9,3 +9,6 @@ credentials.json
 token.json
 store.db*
 fish100.html
+
+.vercel
+.env*.local
