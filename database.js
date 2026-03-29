@@ -1,5 +1,6 @@
 const { neon } = require('@neondatabase/serverless');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const uuidv4 = () => crypto.randomUUID();
 
 function getSQL() {
   if (!process.env.DATABASE_URL) {
