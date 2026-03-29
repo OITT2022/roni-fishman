@@ -55,6 +55,17 @@ async function initDB() {
       updated_at TIMESTAMP DEFAULT NOW()
     )`;
   await sql`
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT DEFAULT '',
+      role TEXT DEFAULT 'admin',
+      is_active BOOLEAN DEFAULT true,
+      last_login TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`;
+  await sql`
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       customer_name TEXT NOT NULL,
@@ -195,6 +206,56 @@ async function updateOrderStatus(id, status) {
   return rows[0];
 }
 
+// ===== Admin Users =====
+async function getAdminByUsername(username) {
+  const sql = getSQL();
+  const rows = await sql`SELECT * FROM admin_users WHERE username = ${username} AND is_active = true`;
+  return rows[0] || null;
+}
+
+async function getAdminById(id) {
+  const sql = getSQL();
+  const rows = await sql`SELECT id, username, display_name, role, is_active, last_login, created_at FROM admin_users WHERE id = ${id}`;
+  return rows[0] || null;
+}
+
+async function getAdminUsers() {
+  const sql = getSQL();
+  return sql`SELECT id, username, display_name, role, is_active, last_login, created_at FROM admin_users ORDER BY created_at`;
+}
+
+async function createAdminUser({ username, password_hash, display_name, role }) {
+  const sql = getSQL();
+  const id = uuidv4();
+  await sql`INSERT INTO admin_users (id, username, password_hash, display_name, role) VALUES (${id}, ${username}, ${password_hash}, ${display_name || ''}, ${role || 'admin'})`;
+  return getAdminById(id);
+}
+
+async function updateAdminUser(id, { display_name, role, is_active }) {
+  const sql = getSQL();
+  await sql`UPDATE admin_users SET display_name = ${display_name || ''}, role = ${role || 'admin'}, is_active = ${is_active !== false} WHERE id = ${id}`;
+  return getAdminById(id);
+}
+
+async function updateAdminPassword(id, password_hash) {
+  const sql = getSQL();
+  await sql`UPDATE admin_users SET password_hash = ${password_hash} WHERE id = ${id}`;
+}
+
+async function updateAdminLastLogin(id) {
+  const sql = getSQL();
+  await sql`UPDATE admin_users SET last_login = NOW() WHERE id = ${id}`;
+}
+
+async function deleteAdminUser(id) {
+  const sql = getSQL();
+  const [count] = await sql`SELECT COUNT(*) as count FROM admin_users WHERE is_active = true`;
+  if (parseInt(count.count) <= 1) {
+    throw new Error('Cannot delete the last admin user');
+  }
+  await sql`DELETE FROM admin_users WHERE id = ${id}`;
+}
+
 // ===== Stats =====
 async function getStats() {
   const sql = getSQL();
@@ -217,5 +278,6 @@ module.exports = {
   getCategories, getCategoryById, createCategory, updateCategory, deleteCategory,
   getProducts, getProductById, createProduct, updateProduct, deleteProduct,
   getOrders, createOrder, updateOrderStatus,
+  getAdminByUsername, getAdminById, getAdminUsers, createAdminUser, updateAdminUser, updateAdminPassword, updateAdminLastLogin, deleteAdminUser,
   getStats,
 };

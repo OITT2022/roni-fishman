@@ -214,6 +214,7 @@
                 <ul class="nav-links">
                     <li><a href="/">חנות</a></li>
                     <li><a href="/admin" style="color:var(--accent-color)">ניהול</a></li>
+                    <li><a href="#" onclick="logout()" style="color:var(--danger)">יציאה</a></li>
                 </ul>
             </nav>
         </div>
@@ -225,6 +226,10 @@
             <a href="#" data-section="products">📦 מוצרים</a>
             <a href="#" data-section="categories">📁 קטגוריות</a>
             <a href="#" data-section="orders">🧾 הזמנות</a>
+            <a href="#" data-section="admins">👤 מנהלים</a>
+            <div style="position:absolute;bottom:1rem;right:0;left:0;padding:0 1rem">
+                <div style="color:var(--text-secondary);font-size:0.8rem;padding:0 8px" id="currentUserDisplay"></div>
+            </div>
         </aside>
 
         <main class="admin-content" id="adminContent">
@@ -343,14 +348,42 @@
     </div>
 
     <script>
+        // ========== Auth Check ==========
+        const token = localStorage.getItem('admin_token');
+        if (!token) { window.location.href = '/login'; }
+
+        // Verify token on load
+        fetch('/api/auth/verify', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        }).then(res => {
+            if (!res.ok) { logout(); return; }
+            return res.json();
+        }).then(data => {
+            if (data && data.user) {
+                const el = document.getElementById('currentUserDisplay');
+                if (el) el.textContent = data.user.display_name || data.user.username;
+            }
+        }).catch(() => logout());
+
+        function logout() {
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_user');
+            window.location.href = '/login';
+        }
+
+        function getAuthHeaders() {
+            return { 'Authorization': 'Bearer ' + localStorage.getItem('admin_token') };
+        }
+
         // ========== State ==========
         let categories = [];
         let products = [];
         let orders = [];
+        let adminUsers = [];
         let currentSection = 'dashboard';
 
         // ========== Navigation ==========
-        document.querySelectorAll('.admin-sidebar a').forEach(link => {
+        document.querySelectorAll('.admin-sidebar a[data-section]').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 document.querySelectorAll('.admin-sidebar a').forEach(l => l.classList.remove('active'));
@@ -362,7 +395,9 @@
 
         // ========== API Helpers ==========
         async function api(url, options = {}) {
+            options.headers = { ...options.headers, ...getAuthHeaders() };
             const res = await fetch(url, options);
+            if (res.status === 401 || res.status === 403) { logout(); return null; }
             return res.json();
         }
 
@@ -383,6 +418,7 @@
                 case 'products': renderProducts(content); break;
                 case 'categories': renderCategories(content); break;
                 case 'orders': renderOrders(content); break;
+                case 'admins': renderAdmins(content); break;
             }
         }
 
@@ -542,6 +578,136 @@
             return map[status] || status;
         }
 
+        // ========== Admin Users Section ==========
+        async function renderAdmins(el) {
+            adminUsers = await api('/api/admin-users') || [];
+            const currentUser = JSON.parse(localStorage.getItem('admin_user') || '{}');
+            el.innerHTML = `
+                <div class="admin-header">
+                    <h1>ניהול מנהלים (${adminUsers.length})</h1>
+                    <div style="display:flex;gap:0.5rem">
+                        <button class="btn btn-secondary" onclick="showChangePassword()">🔑 שנה סיסמה</button>
+                        <button class="btn btn-primary" onclick="showAddAdmin()">+ הוסף מנהל</button>
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr><th>שם משתמש</th><th>שם תצוגה</th><th>תפקיד</th><th>פעיל</th><th>כניסה אחרונה</th><th>פעולות</th></tr>
+                    </thead>
+                    <tbody>
+                        ${adminUsers.map(u => `
+                            <tr>
+                                <td><strong>${u.username}</strong>${u.id === currentUser.id ? ' <span class="tag">אתה</span>' : ''}</td>
+                                <td>${u.display_name || '-'}</td>
+                                <td>${u.role === 'superadmin' ? 'מנהל ראשי' : 'מנהל'}</td>
+                                <td>${u.is_active ? '<span style="color:var(--success)">פעיל</span>' : '<span style="color:var(--danger)">מושבת</span>'}</td>
+                                <td>${u.last_login ? new Date(u.last_login).toLocaleString('he-IL') : 'טרם התחבר'}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        ${u.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="deleteAdmin('${u.id}', '${u.username}')">🗑️</button>` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                <div id="adminFormArea" style="margin-top:2rem"></div>
+            `;
+        }
+
+        function showAddAdmin() {
+            document.getElementById('adminFormArea').innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;max-width:500px">
+                    <h3 style="margin-bottom:1rem">הוסף מנהל חדש</h3>
+                    <form id="addAdminForm">
+                        <div class="form-group">
+                            <label>שם משתמש *</label>
+                            <input type="text" id="newAdminUsername" required minlength="3" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label>סיסמה * (לפחות 6 תווים)</label>
+                            <input type="password" id="newAdminPassword" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <div class="form-group">
+                            <label>שם תצוגה</label>
+                            <input type="text" id="newAdminDisplayName">
+                        </div>
+                        <div style="display:flex;gap:1rem">
+                            <button type="submit" class="btn btn-primary">צור מנהל</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('adminFormArea').innerHTML=''">ביטול</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.getElementById('addAdminForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const data = {
+                    username: document.getElementById('newAdminUsername').value.trim(),
+                    password: document.getElementById('newAdminPassword').value,
+                    display_name: document.getElementById('newAdminDisplayName').value.trim(),
+                };
+                const result = await api('/api/admin-users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                    body: JSON.stringify(data),
+                });
+                if (result && result.error) { alert(result.error); return; }
+                renderSection();
+            });
+        }
+
+        function showChangePassword() {
+            document.getElementById('adminFormArea').innerHTML = `
+                <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;max-width:500px">
+                    <h3 style="margin-bottom:1rem">שינוי סיסמה</h3>
+                    <form id="changePwForm">
+                        <div class="form-group">
+                            <label>סיסמה נוכחית *</label>
+                            <input type="password" id="currentPw" required autocomplete="current-password">
+                        </div>
+                        <div class="form-group">
+                            <label>סיסמה חדשה * (לפחות 6 תווים)</label>
+                            <input type="password" id="newPw" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <div class="form-group">
+                            <label>אימות סיסמה חדשה *</label>
+                            <input type="password" id="confirmPw" required minlength="6" autocomplete="new-password">
+                        </div>
+                        <div style="display:flex;gap:1rem">
+                            <button type="submit" class="btn btn-primary">שנה סיסמה</button>
+                            <button type="button" class="btn btn-secondary" onclick="document.getElementById('adminFormArea').innerHTML=''">ביטול</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.getElementById('changePwForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newPw = document.getElementById('newPw').value;
+                if (newPw !== document.getElementById('confirmPw').value) {
+                    alert('הסיסמאות לא תואמות');
+                    return;
+                }
+                const result = await api('/api/auth/change-password', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+                    body: JSON.stringify({
+                        current_password: document.getElementById('currentPw').value,
+                        new_password: newPw,
+                    }),
+                });
+                if (result && result.error) { alert(result.error); return; }
+                alert('הסיסמה שונתה בהצלחה');
+                document.getElementById('adminFormArea').innerHTML = '';
+            });
+        }
+
+        async function deleteAdmin(id, username) {
+            if (!confirm('למחוק את המנהל "' + username + '"?')) return;
+            const result = await api('/api/admin-users/' + id, { method: 'DELETE' });
+            if (result && result.error) { alert(result.error); return; }
+            renderSection();
+        }
+
         // ========== Modal Helpers ==========
         function openModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -598,27 +764,27 @@
             const id = document.getElementById('productId').value;
             const formData = new FormData();
 
-            formData.append('name', form.name.value);
-            formData.append('category_id', form.category_id.value);
-            formData.append('price', form.price.value);
-            formData.append('unit', form.unit.value);
-            formData.append('price_label', form.price_label.value);
-            formData.append('short_description', form.short_description.value);
-            formData.append('description', form.description.value);
-            formData.append('in_stock', form.in_stock.checked ? '1' : '0');
-            formData.append('is_featured', form.is_featured.checked ? '1' : '0');
-            formData.append('sort_order', form.sort_order.value);
-
             const tagsStr = form.tags.value;
-            const tags = tagsStr ? JSON.stringify(tagsStr.split(',').map(t => t.trim()).filter(Boolean)) : '[]';
-            formData.append('tags', tags);
+            const tags = tagsStr ? tagsStr.split(',').map(t => t.trim()).filter(Boolean) : [];
 
-            const imageFile = document.getElementById('productImage').files[0];
-            if (imageFile) formData.append('image', imageFile);
+            const data = {
+                name: form.name.value,
+                category_id: form.category_id.value,
+                price: form.price.value,
+                unit: form.unit.value,
+                price_label: form.price_label.value,
+                short_description: form.short_description.value,
+                description: form.description.value,
+                in_stock: form.in_stock.checked ? '1' : '0',
+                is_featured: form.is_featured.checked ? '1' : '0',
+                sort_order: form.sort_order.value,
+                tags: JSON.stringify(tags),
+                image: document.getElementById('imagePreview').src || '',
+            };
 
             const url = id ? `/api/products/${id}` : '/api/products';
             const method = id ? 'PUT' : 'POST';
-            await fetch(url, { method, body: formData });
+            await fetch(url, { method, body: JSON.stringify(data), headers: { 'Content-Type': 'application/json', ...getAuthHeaders() } });
             closeModal('productModal');
             renderSection();
         });
