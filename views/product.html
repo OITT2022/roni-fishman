@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>החנות של רוני - מוצר</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">החנות של רוני</a>
+                <ul class="nav-links">
+                    <li><a href="/">חנות</a></li>
+                    <li><a href="/cart" class="cart-icon">🛒 <span class="cart-badge">0</span></a></li>
+                </ul>
+                <div class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('active')">
+                    <span></span><span></span><span></span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <section class="product-detail">
+        <div class="container">
+            <div id="productContent">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-bottom">
+                &copy; 2026 החנות של רוני - כל הזכויות שמורות
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/cart.js"></script>
+    <script>
+        let product = null;
+        let quantity = 1;
+
+        async function loadProduct() {
+            const slug = window.location.pathname.split('/product/')[1];
+            const res = await fetch(`/api/products/${slug}`);
+            if (!res.ok) {
+                document.getElementById('productContent').innerHTML = '<div style="text-align:center;padding:4rem"><h2>המוצר לא נמצא</h2><a href="/" class="btn btn-primary" style="margin-top:1rem">חזרה לחנות</a></div>';
+                return;
+            }
+            product = await res.json();
+            document.title = `החנות של רוני - ${product.name}`;
+            render();
+        }
+
+        function render() {
+            const p = product;
+            document.getElementById('productContent').innerHTML = `
+                <a href="/" style="color:var(--text-secondary);margin-bottom:1.5rem;display:inline-block">&larr; חזרה לחנות</a>
+                <div class="product-detail-grid">
+                    <div class="product-detail-image">
+                        ${p.image
+                            ? `<img src="${p.image}" alt="${p.name}">`
+                            : `<div style="height:400px;background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;font-size:6rem;border-radius:12px">🐟</div>`
+                        }
+                    </div>
+                    <div class="product-detail-info">
+                        <span class="category-tag">${p.category_name || ''}</span>
+                        <h1>${p.name}</h1>
+                        <div class="price-block">${p.price_label || '₪' + p.price.toFixed(2)} <span style="font-size:1rem;color:var(--text-secondary)">/ ${p.unit}</span></div>
+
+                        <div class="description">${(p.description || '').replace(/\n/g, '<br>')}</div>
+
+                        ${p.tags && p.tags.length ? `<div style="margin-bottom:1.5rem">${p.tags.map(t => `<span class="tag">${t}</span>`).join(' ')}</div>` : ''}
+
+                        ${p.in_stock ? `
+                            <label style="color:var(--text-secondary);margin-bottom:0.5rem;display:block">כמות (${p.unit}):</label>
+                            <div class="quantity-selector">
+                                <button onclick="changeQty(-0.5)">-</button>
+                                <input type="number" id="qty" value="1" min="0.5" step="0.5">
+                                <button onclick="changeQty(0.5)">+</button>
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:1.1rem;padding:14px" onclick="addToCart()">
+                                הוסף לסל - ₪<span id="totalPrice">${p.price.toFixed(2)}</span>
+                            </button>
+                        ` : `<div class="out-of-stock" style="font-size:1.2rem;text-align:center;padding:1rem">מוצר זה אינו זמין כרגע</div>`}
+                    </div>
+                </div>
+            `;
+        }
+
+        function changeQty(delta) {
+            const input = document.getElementById('qty');
+            let val = parseFloat(input.value) + delta;
+            if (val < 0.5) val = 0.5;
+            input.value = val;
+            document.getElementById('totalPrice').textContent = (product.price * val).toFixed(2);
+        }
+
+        function addToCart() {
+            const qty = parseFloat(document.getElementById('qty').value) || 1;
+            Cart.addItem(product, qty);
+        }
+
+        loadProduct();
+    </script>
+</body>
+</html>

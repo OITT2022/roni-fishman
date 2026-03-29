@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>החנות של רוני - סל קניות</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">החנות של רוני</a>
+                <ul class="nav-links">
+                    <li><a href="/">חנות</a></li>
+                    <li><a href="/cart" class="cart-icon">🛒 <span class="cart-badge">0</span></a></li>
+                </ul>
+                <div class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('active')">
+                    <span></span><span></span><span></span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <section class="cart-page">
+        <div class="container">
+            <h1 style="margin-bottom:2rem">סל הקניות</h1>
+            <div id="cartContent"></div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-bottom">
+                &copy; 2026 החנות של רוני - כל הזכויות שמורות
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/cart.js"></script>
+    <script>
+        const DELIVERY_FEE = 30;
+
+        function renderCart() {
+            const items = Cart.getItems();
+            const container = document.getElementById('cartContent');
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div class="cart-empty">
+                        <div style="font-size:4rem;margin-bottom:1rem">🛒</div>
+                        <h2>הסל ריק</h2>
+                        <p>עדיין לא הוספת מוצרים לסל הקניות</p>
+                        <a href="/" class="btn btn-primary">לחנות</a>
+                    </div>
+                `;
+                return;
+            }
+
+            const subtotal = Cart.getTotal();
+            const total = subtotal + DELIVERY_FEE;
+
+            container.innerHTML = `
+                <div class="cart-items">
+                    ${items.map(item => `
+                        <div class="cart-item">
+                            ${item.image
+                                ? `<img src="${item.image}" alt="${item.name}">`
+                                : `<div style="width:80px;height:80px;background:var(--gradient-primary);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2rem">🐟</div>`
+                            }
+                            <div class="cart-item-info">
+                                <h4>${item.name}</h4>
+                                <span class="item-price">₪${item.price.toFixed(2)} / ${item.unit}</span>
+                            </div>
+                            <div class="cart-item-actions">
+                                <div class="quantity-selector">
+                                    <button onclick="updateQty('${item.id}', ${item.quantity - 0.5})">-</button>
+                                    <input type="number" value="${item.quantity}" min="0.5" step="0.5" onchange="updateQty('${item.id}', parseFloat(this.value))">
+                                    <button onclick="updateQty('${item.id}', ${item.quantity + 0.5})">+</button>
+                                </div>
+                                <div style="font-weight:700;min-width:70px;text-align:center">₪${(item.price * item.quantity).toFixed(2)}</div>
+                                <button class="cart-item-remove" onclick="removeItem('${item.id}')" title="הסר">✕</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="cart-summary">
+                    <div class="cart-summary-row">
+                        <span>סיכום ביניים</span>
+                        <span>₪${subtotal.toFixed(2)}</span>
+                    </div>
+                    <div class="cart-summary-row">
+                        <span>דמי משלוח</span>
+                        <span>₪${DELIVERY_FEE.toFixed(2)}</span>
+                    </div>
+                    <div class="cart-summary-row total">
+                        <span>סה"כ</span>
+                        <span>₪${total.toFixed(2)}</span>
+                    </div>
+                    <div style="margin-top:1.5rem;display:flex;gap:1rem">
+                        <a href="/" class="btn btn-secondary" style="flex:1;justify-content:center">המשך קניות</a>
+                        <a href="/checkout" class="btn btn-primary" style="flex:1;justify-content:center">לתשלום</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateQty(id, qty) {
+            if (qty < 0.5) return removeItem(id);
+            Cart.updateQuantity(id, qty);
+            renderCart();
+        }
+
+        function removeItem(id) {
+            Cart.removeItem(id);
+            renderCart();
+        }
+
+        renderCart();
+    </script>
+</body>
+</html>

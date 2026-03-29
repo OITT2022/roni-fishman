@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>החנות של רוני - דגים טריים ותבלינים עד הבית</title>
+    <meta name="description" content="החנות של רוני - חנות דגים ותבלינים אונליין. דגים טריים מהדייג עד לבית שלכם.">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">החנות של רוני</a>
+                <ul class="nav-links">
+                    <li><a href="/">חנות</a></li>
+                    <li><a href="#categories">קטגוריות</a></li>
+                    <li><a href="/cart" class="cart-icon">🛒 <span class="cart-badge">0</span></a></li>
+                </ul>
+                <div class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('active')">
+                    <span></span><span></span><span></span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>דגים טריים ותבלינים עד הבית</h1>
+            <p>החנות של רוני מביאה לכם מבחר דגי ים טריים מהדייג המקומי ותבלינים איכותיים ישירות עד לבית. 40 שנות ניסיון בתחום.</p>
+            <a href="#products" class="btn btn-primary" style="font-size:1.1rem; padding:14px 36px;">לקטלוג המוצרים</a>
+        </div>
+    </section>
+
+    <div class="categories-bar" id="categories">
+        <div class="container">
+            <ul class="categories-list" id="categoriesList">
+                <li><span class="category-pill active" data-category="all">הכל</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <section class="products-section" id="products">
+        <div class="container">
+            <div class="products-header">
+                <h2 id="productsTitle">כל המוצרים</h2>
+                <div class="search-box">
+                    <span>🔍</span>
+                    <input type="text" id="searchInput" placeholder="חיפוש מוצרים...">
+                </div>
+            </div>
+            <div class="products-grid" id="productsGrid">
+                <div class="loading-spinner"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-section">
+                    <h4>החנות של רוני</h4>
+                    <p>דגים טריים מהדייג המקומי ותבלינים איכותיים ישירות עד לבית שלכם.</p>
+                    <p>40 שנות ניסיון בתחום.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>צור קשר</h4>
+                    <p>📧 info@sea2door.co.il</p>
+                    <p>📞 052-123-4567</p>
+                    <p>🕒 א'-ה': 07:00-19:00</p>
+                    <p>🕒 ו': 07:00-15:00</p>
+                </div>
+                <div class="footer-section">
+                    <h4>קישורים</h4>
+                    <a href="/">חנות</a>
+                    <a href="/cart">סל קניות</a>
+                    <a href="/admin">ניהול</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                &copy; 2026 החנות של רוני - כל הזכויות שמורות
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/cart.js"></script>
+    <script>
+        let allProducts = [];
+        let allCategories = [];
+        let currentCategory = 'all';
+
+        async function loadCategories() {
+            const res = await fetch('/api/categories');
+            allCategories = await res.json();
+            const list = document.getElementById('categoriesList');
+            list.innerHTML = '<li><span class="category-pill active" data-category="all">הכל</span></li>';
+            allCategories.forEach(cat => {
+                list.innerHTML += `<li><span class="category-pill" data-category="${cat.id}">${cat.icon || ''} ${cat.name}</span></li>`;
+            });
+            document.querySelectorAll('.category-pill').forEach(pill => {
+                pill.addEventListener('click', () => {
+                    document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
+                    pill.classList.add('active');
+                    currentCategory = pill.dataset.category;
+                    const title = document.getElementById('productsTitle');
+                    title.textContent = currentCategory === 'all' ? 'כל המוצרים' : pill.textContent.trim();
+                    filterProducts();
+                });
+            });
+        }
+
+        async function loadProducts() {
+            const res = await fetch('/api/products');
+            allProducts = await res.json();
+            filterProducts();
+        }
+
+        function filterProducts() {
+            const search = document.getElementById('searchInput').value.trim().toLowerCase();
+            let filtered = allProducts;
+
+            if (currentCategory !== 'all') {
+                filtered = filtered.filter(p => p.category_id === currentCategory);
+            }
+            if (search) {
+                filtered = filtered.filter(p =>
+                    p.name.toLowerCase().includes(search) ||
+                    (p.description || '').toLowerCase().includes(search) ||
+                    (p.tags || []).some(t => t.toLowerCase().includes(search))
+                );
+            }
+            renderProducts(filtered);
+        }
+
+        function renderProducts(products) {
+            const grid = document.getElementById('productsGrid');
+            if (products.length === 0) {
+                grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-secondary)"><h3>לא נמצאו מוצרים</h3><p>נסו לחפש משהו אחר</p></div>';
+                return;
+            }
+            grid.innerHTML = products.map(p => `
+                <div class="product-card" onclick="window.location.href='/product/${p.slug}'">
+                    ${p.image
+                        ? `<img src="${p.image}" alt="${p.name}" class="product-image" loading="lazy">`
+                        : `<div class="product-image-placeholder">🐟</div>`
+                    }
+                    <div class="product-info">
+                        <h3>${p.name}</h3>
+                        <p class="product-desc">${p.short_description || p.description || ''}</p>
+                        <div class="product-meta">
+                            <div>
+                                <span class="product-price">${p.price_label || '₪' + p.price.toFixed(2)}</span>
+                                <span class="product-unit">/ ${p.unit}</span>
+                            </div>
+                            ${p.in_stock
+                                ? `<button class="add-to-cart-btn" onclick="event.stopPropagation(); Cart.addItem(${JSON.stringify({id:p.id,name:p.name,price:p.price,unit:p.unit,image:p.image}).replace(/"/g, '&quot;')})">הוסף לסל</button>`
+                                : `<span class="out-of-stock">אזל מהמלאי</span>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('searchInput').addEventListener('input', filterProducts);
+
+        loadCategories();
+        loadProducts();
+    </script>
+</body>
+</html>

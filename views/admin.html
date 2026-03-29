@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>החנות של רוני - ניהול חנות</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+            padding-top: 65px;
+        }
+
+        .admin-sidebar {
+            width: 220px;
+            background: var(--bg-card);
+            border-left: 1px solid var(--border-color);
+            padding: 1.5rem 0;
+            position: fixed;
+            top: 65px;
+            right: 0;
+            bottom: 0;
+            overflow-y: auto;
+        }
+
+        .admin-sidebar a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 24px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .admin-sidebar a:hover,
+        .admin-sidebar a.active {
+            background: rgba(255,107,53,0.1);
+            color: var(--accent-color);
+            border-right: 3px solid var(--accent-color);
+        }
+
+        .admin-content {
+            flex: 1;
+            margin-right: 220px;
+            padding: 2rem;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .stat-card .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background: var(--bg-dark);
+            padding: 12px 16px;
+            text-align: right;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .data-table td {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        .data-table tr:hover td {
+            background: var(--bg-card-hover);
+        }
+
+        .data-table img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+
+        .table-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .modal h2 {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .image-preview {
+            width: 100%;
+            max-width: 200px;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+        }
+
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--border-color);
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 20px;
+            width: 20px;
+            right: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle-switch input:checked + .toggle-slider { background: var(--accent-color); }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(-22px); }
+
+        @media (max-width: 768px) {
+            .admin-sidebar { display: none; }
+            .admin-content { margin-right: 0; }
+            .modal .form-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">החנות של רוני</a>
+                <ul class="nav-links">
+                    <li><a href="/">חנות</a></li>
+                    <li><a href="/admin" style="color:var(--accent-color)">ניהול</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <a href="#" class="active" data-section="dashboard">📊 דשבורד</a>
+            <a href="#" data-section="products">📦 מוצרים</a>
+            <a href="#" data-section="categories">📁 קטגוריות</a>
+            <a href="#" data-section="orders">🧾 הזמנות</a>
+        </aside>
+
+        <main class="admin-content" id="adminContent">
+        </main>
+    </div>
+
+    <!-- Product Modal -->
+    <div class="modal-overlay" id="productModal">
+        <div class="modal">
+            <h2 id="productModalTitle">הוסף מוצר</h2>
+            <form id="productForm" enctype="multipart/form-data">
+                <input type="hidden" name="id" id="productId">
+                <div class="form-group">
+                    <label>שם המוצר *</label>
+                    <input type="text" name="name" id="productName" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>קטגוריה *</label>
+                        <select name="category_id" id="productCategory" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>מחיר *</label>
+                        <input type="number" name="price" id="productPrice" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>יחידה</label>
+                        <select name="unit" id="productUnit">
+                            <option value="kg">ק"ג</option>
+                            <option value="יחידה">יחידה</option>
+                            <option value="חבילה">חבילה</option>
+                            <option value="100g">100 גרם</option>
+                            <option value="מנה">מנה</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>תווית מחיר (אופציונלי)</label>
+                        <input type="text" name="price_label" id="productPriceLabel" placeholder='לדוגמה: החל מ-45₪ לק"ג'>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>תיאור קצר</label>
+                    <input type="text" name="short_description" id="productShortDesc" maxlength="120">
+                </div>
+                <div class="form-group">
+                    <label>תיאור מלא</label>
+                    <textarea name="description" id="productDesc" rows="4"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>תגיות (מופרדות בפסיקים)</label>
+                    <input type="text" name="tags" id="productTags" placeholder="טרי, ים תיכון, פרימיום">
+                </div>
+                <div class="form-group">
+                    <label>תמונה</label>
+                    <input type="file" name="image" id="productImage" accept="image/*" style="color:var(--text-secondary)">
+                    <img id="imagePreview" class="image-preview" style="display:none">
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="display:flex;align-items:center;gap:12px">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="in_stock" id="productInStock" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>במלאי</span>
+                    </div>
+                    <div class="form-group" style="display:flex;align-items:center;gap:12px">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="is_featured" id="productFeatured">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span>מוצר מומלץ</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>סדר מיון</label>
+                    <input type="number" name="sort_order" id="productSortOrder" value="0" min="0">
+                </div>
+                <div style="display:flex;gap:1rem;margin-top:1.5rem">
+                    <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center">שמור</button>
+                    <button type="button" class="btn btn-secondary" style="flex:1;justify-content:center" onclick="closeModal('productModal')">ביטול</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal">
+            <h2 id="categoryModalTitle">הוסף קטגוריה</h2>
+            <form id="categoryForm">
+                <input type="hidden" name="id" id="categoryId">
+                <div class="form-group">
+                    <label>שם הקטגוריה *</label>
+                    <input type="text" name="name" id="categoryName" required>
+                </div>
+                <div class="form-group">
+                    <label>אייקון (אימוג'י)</label>
+                    <input type="text" name="icon" id="categoryIcon" placeholder="🐟">
+                </div>
+                <div class="form-group">
+                    <label>תיאור</label>
+                    <textarea name="description" id="categoryDesc" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>סדר מיון</label>
+                    <input type="number" name="sort_order" id="categorySortOrder" value="0" min="0">
+                </div>
+                <div style="display:flex;gap:1rem;margin-top:1.5rem">
+                    <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center">שמור</button>
+                    <button type="button" class="btn btn-secondary" style="flex:1;justify-content:center" onclick="closeModal('categoryModal')">ביטול</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // ========== State ==========
+        let categories = [];
+        let products = [];
+        let orders = [];
+        let currentSection = 'dashboard';
+
+        // ========== Navigation ==========
+        document.querySelectorAll('.admin-sidebar a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelectorAll('.admin-sidebar a').forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                currentSection = link.dataset.section;
+                renderSection();
+            });
+        });
+
+        // ========== API Helpers ==========
+        async function api(url, options = {}) {
+            const res = await fetch(url, options);
+            return res.json();
+        }
+
+        async function loadData() {
+            [categories, products, orders] = await Promise.all([
+                api('/api/categories'),
+                api('/api/products'),
+                api('/api/orders'),
+            ]);
+        }
+
+        // ========== Render Sections ==========
+        async function renderSection() {
+            await loadData();
+            const content = document.getElementById('adminContent');
+            switch (currentSection) {
+                case 'dashboard': renderDashboard(content); break;
+                case 'products': renderProducts(content); break;
+                case 'categories': renderCategories(content); break;
+                case 'orders': renderOrders(content); break;
+            }
+        }
+
+        function renderDashboard(el) {
+            const pendingOrders = orders.filter(o => o.status === 'pending').length;
+            const totalRevenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+            el.innerHTML = `
+                <div class="admin-header"><h1>דשבורד</h1></div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">${products.length}</div>
+                        <div class="stat-label">מוצרים</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${categories.length}</div>
+                        <div class="stat-label">קטגוריות</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${orders.length}</div>
+                        <div class="stat-label">הזמנות</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${pendingOrders}</div>
+                        <div class="stat-label">ממתינות לטיפול</div>
+                    </div>
+                </div>
+                <div class="stats-grid" style="grid-template-columns:1fr">
+                    <div class="stat-card">
+                        <div class="stat-value">₪${totalRevenue.toFixed(2)}</div>
+                        <div class="stat-label">סה"כ הכנסות</div>
+                    </div>
+                </div>
+                ${orders.length > 0 ? `
+                    <h3 style="margin:2rem 0 1rem">הזמנות אחרונות</h3>
+                    <table class="data-table">
+                        <thead><tr><th>מזהה</th><th>לקוח</th><th>סה"כ</th><th>סטטוס</th><th>תאריך</th></tr></thead>
+                        <tbody>
+                            ${orders.slice(0, 5).map(o => `
+                                <tr>
+                                    <td>${o.id.slice(0, 8)}...</td>
+                                    <td>${o.customer_name}</td>
+                                    <td>₪${(o.total || 0).toFixed(2)}</td>
+                                    <td><span class="badge badge-${o.status}">${statusLabel(o.status)}</span></td>
+                                    <td>${new Date(o.created_at).toLocaleDateString('he-IL')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                ` : '<p style="color:var(--text-secondary);margin-top:2rem">אין עדיין הזמנות</p>'}
+            `;
+        }
+
+        function renderProducts(el) {
+            el.innerHTML = `
+                <div class="admin-header">
+                    <h1>ניהול מוצרים (${products.length})</h1>
+                    <button class="btn btn-primary" onclick="openProductModal()">+ הוסף מוצר</button>
+                </div>
+                ${products.length === 0 ? '<p style="color:var(--text-secondary)">אין מוצרים עדיין. הוסף את המוצר הראשון!</p>' : `
+                <table class="data-table">
+                    <thead>
+                        <tr><th>תמונה</th><th>שם</th><th>קטגוריה</th><th>מחיר</th><th>מלאי</th><th>מומלץ</th><th>פעולות</th></tr>
+                    </thead>
+                    <tbody>
+                        ${products.map(p => `
+                            <tr>
+                                <td>${p.image ? `<img src="${p.image}" alt="">` : '<div style="width:50px;height:50px;background:var(--bg-dark);border-radius:6px;display:flex;align-items:center;justify-content:center">🐟</div>'}</td>
+                                <td><strong>${p.name}</strong><br><small style="color:var(--text-secondary)">${p.short_description || ''}</small></td>
+                                <td>${p.category_name || '-'}</td>
+                                <td>₪${p.price.toFixed(2)} / ${p.unit}</td>
+                                <td>${p.in_stock ? '<span style="color:var(--success)">במלאי</span>' : '<span style="color:var(--danger)">אזל</span>'}</td>
+                                <td>${p.is_featured ? '⭐' : ''}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button class="btn btn-sm btn-secondary" onclick="editProduct('${p.id}')">✏️ ערוך</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}', '${p.name}')">🗑️</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`}
+            `;
+        }
+
+        function renderCategories(el) {
+            el.innerHTML = `
+                <div class="admin-header">
+                    <h1>ניהול קטגוריות (${categories.length})</h1>
+                    <button class="btn btn-primary" onclick="openCategoryModal()">+ הוסף קטגוריה</button>
+                </div>
+                ${categories.length === 0 ? '<p style="color:var(--text-secondary)">אין קטגוריות עדיין. הוסף את הקטגוריה הראשונה!</p>' : `
+                <table class="data-table">
+                    <thead>
+                        <tr><th>אייקון</th><th>שם</th><th>תיאור</th><th>מוצרים</th><th>פעולות</th></tr>
+                    </thead>
+                    <tbody>
+                        ${categories.map(c => {
+                            const count = products.filter(p => p.category_id === c.id).length;
+                            return `
+                            <tr>
+                                <td style="font-size:1.5rem">${c.icon || '📁'}</td>
+                                <td><strong>${c.name}</strong></td>
+                                <td style="color:var(--text-secondary)">${c.description || '-'}</td>
+                                <td>${count}</td>
+                                <td>
+                                    <div class="table-actions">
+                                        <button class="btn btn-sm btn-secondary" onclick="editCategory('${c.id}')">✏️ ערוך</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteCategory('${c.id}', '${c.name}')">🗑️</button>
+                                    </div>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>`}
+            `;
+        }
+
+        function renderOrders(el) {
+            el.innerHTML = `
+                <div class="admin-header"><h1>הזמנות (${orders.length})</h1></div>
+                ${orders.length === 0 ? '<p style="color:var(--text-secondary)">אין הזמנות עדיין.</p>' : `
+                <table class="data-table">
+                    <thead>
+                        <tr><th>מזהה</th><th>לקוח</th><th>טלפון</th><th>עיר</th><th>פריטים</th><th>סה"כ</th><th>סטטוס</th><th>תאריך</th><th>פעולות</th></tr>
+                    </thead>
+                    <tbody>
+                        ${orders.map(o => {
+                            const items = Array.isArray(o.items) ? o.items : JSON.parse(o.items || '[]');
+                            return `
+                            <tr>
+                                <td><small>${o.id.slice(0, 8)}</small></td>
+                                <td>${o.customer_name}</td>
+                                <td><a href="tel:${o.customer_phone}">${o.customer_phone}</a></td>
+                                <td>${o.delivery_city}</td>
+                                <td>${items.length} פריטים</td>
+                                <td>₪${(o.total || 0).toFixed(2)}</td>
+                                <td><span class="badge badge-${o.status}">${statusLabel(o.status)}</span></td>
+                                <td>${new Date(o.created_at).toLocaleDateString('he-IL')}</td>
+                                <td>
+                                    <select onchange="updateOrderStatus('${o.id}', this.value)" style="background:var(--bg-dark);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;padding:4px 8px">
+                                        <option value="pending" ${o.status === 'pending' ? 'selected' : ''}>ממתין</option>
+                                        <option value="confirmed" ${o.status === 'confirmed' ? 'selected' : ''}>אושר</option>
+                                        <option value="delivered" ${o.status === 'delivered' ? 'selected' : ''}>נמסר</option>
+                                        <option value="cancelled" ${o.status === 'cancelled' ? 'selected' : ''}>בוטל</option>
+                                    </select>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>`}
+            `;
+        }
+
+        function statusLabel(status) {
+            const map = { pending: 'ממתין', confirmed: 'אושר', delivered: 'נמסר', cancelled: 'בוטל' };
+            return map[status] || status;
+        }
+
+        // ========== Modal Helpers ==========
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // ========== Product CRUD ==========
+        function openProductModal(product = null) {
+            const form = document.getElementById('productForm');
+            form.reset();
+            document.getElementById('imagePreview').style.display = 'none';
+
+            // Populate category dropdown
+            const catSelect = document.getElementById('productCategory');
+            catSelect.innerHTML = categories.map(c => `<option value="${c.id}">${c.icon || ''} ${c.name}</option>`).join('');
+
+            if (product) {
+                document.getElementById('productModalTitle').textContent = 'ערוך מוצר';
+                document.getElementById('productId').value = product.id;
+                document.getElementById('productName').value = product.name;
+                document.getElementById('productCategory').value = product.category_id;
+                document.getElementById('productPrice').value = product.price;
+                document.getElementById('productUnit').value = product.unit;
+                document.getElementById('productPriceLabel').value = product.price_label || '';
+                document.getElementById('productShortDesc').value = product.short_description || '';
+                document.getElementById('productDesc').value = product.description || '';
+                document.getElementById('productTags').value = (product.tags || []).join(', ');
+                document.getElementById('productInStock').checked = !!product.in_stock;
+                document.getElementById('productFeatured').checked = !!product.is_featured;
+                document.getElementById('productSortOrder').value = product.sort_order || 0;
+                if (product.image) {
+                    document.getElementById('imagePreview').src = product.image;
+                    document.getElementById('imagePreview').style.display = 'block';
+                }
+            } else {
+                document.getElementById('productModalTitle').textContent = 'הוסף מוצר';
+                document.getElementById('productId').value = '';
+            }
+            openModal('productModal');
+        }
+
+        function editProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (product) openProductModal(product);
+        }
+
+        async function deleteProduct(id, name) {
+            if (!confirm(`למחוק את "${name}"?`)) return;
+            await api(`/api/products/${id}`, { method: 'DELETE' });
+            renderSection();
+        }
+
+        document.getElementById('productForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const id = document.getElementById('productId').value;
+            const formData = new FormData();
+
+            formData.append('name', form.name.value);
+            formData.append('category_id', form.category_id.value);
+            formData.append('price', form.price.value);
+            formData.append('unit', form.unit.value);
+            formData.append('price_label', form.price_label.value);
+            formData.append('short_description', form.short_description.value);
+            formData.append('description', form.description.value);
+            formData.append('in_stock', form.in_stock.checked ? '1' : '0');
+            formData.append('is_featured', form.is_featured.checked ? '1' : '0');
+            formData.append('sort_order', form.sort_order.value);
+
+            const tagsStr = form.tags.value;
+            const tags = tagsStr ? JSON.stringify(tagsStr.split(',').map(t => t.trim()).filter(Boolean)) : '[]';
+            formData.append('tags', tags);
+
+            const imageFile = document.getElementById('productImage').files[0];
+            if (imageFile) formData.append('image', imageFile);
+
+            const url = id ? `/api/products/${id}` : '/api/products';
+            const method = id ? 'PUT' : 'POST';
+            await fetch(url, { method, body: formData });
+            closeModal('productModal');
+            renderSection();
+        });
+
+        document.getElementById('productImage').addEventListener('change', function() {
+            const preview = document.getElementById('imagePreview');
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => { preview.src = e.target.result; preview.style.display = 'block'; };
+                reader.readAsDataURL(this.files[0]);
+            }
+        });
+
+        // ========== Category CRUD ==========
+        function openCategoryModal(category = null) {
+            const form = document.getElementById('categoryForm');
+            form.reset();
+            if (category) {
+                document.getElementById('categoryModalTitle').textContent = 'ערוך קטגוריה';
+                document.getElementById('categoryId').value = category.id;
+                document.getElementById('categoryName').value = category.name;
+                document.getElementById('categoryIcon').value = category.icon || '';
+                document.getElementById('categoryDesc').value = category.description || '';
+                document.getElementById('categorySortOrder').value = category.sort_order || 0;
+            } else {
+                document.getElementById('categoryModalTitle').textContent = 'הוסף קטגוריה';
+                document.getElementById('categoryId').value = '';
+            }
+            openModal('categoryModal');
+        }
+
+        function editCategory(id) {
+            const cat = categories.find(c => c.id === id);
+            if (cat) openCategoryModal(cat);
+        }
+
+        async function deleteCategory(id, name) {
+            if (!confirm(`למחוק את הקטגוריה "${name}"?`)) return;
+            const res = await api(`/api/categories/${id}`, { method: 'DELETE' });
+            if (res.error) { alert(res.error); return; }
+            renderSection();
+        }
+
+        document.getElementById('categoryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('categoryId').value;
+            const data = {
+                name: document.getElementById('categoryName').value,
+                icon: document.getElementById('categoryIcon').value,
+                description: document.getElementById('categoryDesc').value,
+                sort_order: parseInt(document.getElementById('categorySortOrder').value) || 0,
+            };
+            const url = id ? `/api/categories/${id}` : '/api/categories';
+            const method = id ? 'PUT' : 'POST';
+            await api(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            closeModal('categoryModal');
+            renderSection();
+        });
+
+        // ========== Order Status ==========
+        async function updateOrderStatus(id, status) {
+            await api(`/api/orders/${id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+        }
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.remove('active');
+            });
+        });
+
+        // ========== Init ==========
+        renderSection();
+    </script>
+</body>
+</html>

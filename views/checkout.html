@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>החנות של רוני - השלמת הזמנה</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">החנות של רוני</a>
+                <ul class="nav-links">
+                    <li><a href="/">חנות</a></li>
+                    <li><a href="/cart" class="cart-icon">🛒 <span class="cart-badge">0</span></a></li>
+                </ul>
+                <div class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('active')">
+                    <span></span><span></span><span></span>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <section class="checkout-page">
+        <div class="container">
+            <h1 style="margin-bottom:2rem">השלמת הזמנה</h1>
+            <div id="checkoutContent"></div>
+        </div>
+    </section>
+
+    <script src="/js/cart.js"></script>
+    <script>
+        const DELIVERY_FEE = 30;
+        const CITIES = ['תל אביב-יפו','הרצלייה','רמת השרון','רעננה','כפר סבא','פתח תקווה','רמת גן','גבעתיים','בני ברק','חולון','ראשון לציון','רחובות','מודיעין','נתניה','קריית אונו','אור יהודה'];
+
+        function renderCheckout() {
+            const items = Cart.getItems();
+            const container = document.getElementById('checkoutContent');
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="cart-empty"><h2>הסל ריק</h2><a href="/" class="btn btn-primary" style="margin-top:1rem">לחנות</a></div>';
+                return;
+            }
+
+            const subtotal = Cart.getTotal();
+            const total = subtotal + DELIVERY_FEE;
+
+            container.innerHTML = `
+                <div class="checkout-grid">
+                    <div>
+                        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;margin-bottom:2rem">
+                            <h3 style="margin-bottom:1.5rem">פרטי משלוח</h3>
+                            <form id="orderForm">
+                                <div class="form-group">
+                                    <label>שם מלא *</label>
+                                    <input type="text" name="customer_name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>טלפון *</label>
+                                    <input type="tel" name="customer_phone" required placeholder="05X-XXXXXXX">
+                                </div>
+                                <div class="form-group">
+                                    <label>אימייל</label>
+                                    <input type="email" name="customer_email" placeholder="your@email.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>עיר *</label>
+                                    <select name="delivery_city" required>
+                                        <option value="">בחר עיר</option>
+                                        ${CITIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>כתובת מלאה *</label>
+                                    <input type="text" name="delivery_address" required placeholder="רחוב, מספר בית, קומה/דירה">
+                                </div>
+                                <div class="form-group">
+                                    <label>הערות למשלוח</label>
+                                    <textarea name="delivery_notes" placeholder="הערות מיוחדות, שעת העדפה למשלוח..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;font-size:1.1rem;padding:14px" id="submitBtn">
+                                    שלח הזמנה - ₪${total.toFixed(2)}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="cart-summary">
+                            <h3 style="margin-bottom:1rem">סיכום הזמנה</h3>
+                            ${items.map(item => `
+                                <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid var(--border-color)">
+                                    <span>${item.name} x${item.quantity}</span>
+                                    <span>₪${(item.price * item.quantity).toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                            <div class="cart-summary-row" style="margin-top:0.5rem">
+                                <span>סיכום ביניים</span>
+                                <span>₪${subtotal.toFixed(2)}</span>
+                            </div>
+                            <div class="cart-summary-row">
+                                <span>דמי משלוח</span>
+                                <span>₪${DELIVERY_FEE.toFixed(2)}</span>
+                            </div>
+                            <div class="cart-summary-row total">
+                                <span>סה"כ לתשלום</span>
+                                <span>₪${total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('orderForm').addEventListener('submit', submitOrder);
+        }
+
+        async function submitOrder(e) {
+            e.preventDefault();
+            const form = e.target;
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'שולח הזמנה...';
+
+            const items = Cart.getItems();
+            const subtotal = Cart.getTotal();
+
+            const order = {
+                customer_name: form.customer_name.value,
+                customer_phone: form.customer_phone.value,
+                customer_email: form.customer_email.value,
+                delivery_address: form.delivery_address.value,
+                delivery_city: form.delivery_city.value,
+                delivery_notes: form.delivery_notes.value,
+                items,
+                subtotal,
+                delivery_fee: DELIVERY_FEE,
+            };
+
+            try {
+                const res = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(order),
+                });
+
+                if (res.ok) {
+                    Cart.clear();
+                    document.getElementById('checkoutContent').innerHTML = `
+                        <div style="text-align:center;padding:4rem">
+                            <div style="font-size:4rem;margin-bottom:1rem">✅</div>
+                            <h2>ההזמנה התקבלה בהצלחה!</h2>
+                            <p style="color:var(--text-secondary);margin:1rem 0 2rem">ניצור איתך קשר בהקדם לתיאום המשלוח.<br>תודה שקנית בחנות של רוני!</p>
+                            <a href="/" class="btn btn-primary">חזרה לחנות</a>
+                        </div>
+                    `;
+                } else {
+                    throw new Error('Order failed');
+                }
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'שלח הזמנה';
+                alert('אירעה שגיאה בשליחת ההזמנה. נסה שוב.');
+            }
+        }
+
+        renderCheckout();
+    </script>
+</body>
+</html>
