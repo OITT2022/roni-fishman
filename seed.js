@@ -1,6 +1,7 @@
 require('dotenv/config');
 const { neon } = require('@neondatabase/serverless');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const uuidv4 = () => crypto.randomUUID();
 
 function slugify(text) {
   return text.toString().toLowerCase().replace(/[\s]+/g, '-').replace(/[^\u0590-\u05FFa-z0-9\-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '') || uuidv4().slice(0, 8);
